@@ -33,30 +33,34 @@ contains
       IMPLICIT NONE
       INTEGER :: nx, ny, i, j
       REAL(8), ALLOCATABLE :: XX(:), YY(:)
+      REAL(8) :: dx_step, dy_step
 
-      nx = INT(TankSize/grid_dx + 1.0D0)
-      ny = INT(TankSize/grid_dy + 1.0D0)
+      nx = INT(TankSize/grid_dx + 0.5)
+      ny = INT(TankSize/grid_dy + 0.5)
 
-      ALLOCATE (XX(nx), YY(ny))
-      ALLOCATE (Xgrid(ny, nx), Ygrid(ny, nx))
+      dx_step = TankSize/REAL(nx, 8)
+      dy_step = TankSize/REAL(ny, 8)
 
-      DO i = 1, nx
-         XX(i) = (i - 1)*grid_dx
+      ALLOCATE (XX(nx + 1), YY(ny + 1))
+      ALLOCATE (Xgrid(ny + 1, nx + 1), Ygrid(ny + 1, nx + 1))
+
+      DO i = 1, nx + 1
+         XX(i) = (i - 1)*dx_step
       END DO
 
-      DO j = 1, ny
-         YY(j) = (j - 1)*grid_dy
+      DO j = 1, ny + 1
+         YY(j) = (j - 1)*dy_step
       END DO
 
-      DO j = 1, ny
-         DO i = 1, nx
+      DO j = 1, ny + 1
+         DO i = 1, nx + 1
             Xgrid(j, i) = XX(i)
             Ygrid(j, i) = YY(j)
          END DO
       END DO
-      ALLOCATE (show(ny - 1, nx - 1))
-      show = 0.0D0
 
+      ALLOCATE (show(ny, nx))
+      show = 0.0D0
    END SUBROUTINE generate_mesh
 
    SUBROUTINE set_geometry(rinR, routR, rBlade, rTank, rw, rAreaDT, rRotateDT, rtmax, rCentre, rdx, rdy, rAngle1, rAngle2)
@@ -170,16 +174,16 @@ contains
 
    end function find_adjacent
 
-   function triangle_area(point1, point2, point3) result(area)
+   function triangle_area(point1, point2, point3) result(areaa)
       implicit none
       real(8), intent(in) :: point1(2), point2(2), point3(2)
-      real(8) :: area, base, height
+      real(8) :: areaa, base, height
 
       base = sqrt((point2(1) - point1(1))**2 + (point2(2) - point1(2))**2)
 
       height = sqrt((point2(1) - point3(1))**2 + (point2(2) - point3(2))**2)
 
-      area = 0.5d0*base*height
+      areaa = 0.5d0*base*height
    end function triangle_area
 
    function line_circle_intersection(x1, y1, x2, y2, a, b, r) result(points)
@@ -338,7 +342,6 @@ contains
       INTEGER :: ni, nj
       real(8) :: x1, y1, x2, y2, x3, y3, x4, y4
       real(8) :: xpoints(4), ypoints(4)
-      real(8) :: edges(4, 4)
       integer :: q(4)
       integer :: mapping(4, 2)
       integer :: k
@@ -364,7 +367,7 @@ contains
       real(8), allocatable :: coordinate23(:, :), coordinate24(:, :)
       real(8), allocatable :: coordinate29(:, :), coordinate30(:, :)
       real(8), allocatable :: coordinate35(:, :), coordinate36(:, :)
-      real(8) ::area,New_area
+      real(8) ::area, New_area
       real(8), dimension(4, 2) :: trapezoid_Point
       real(8) :: trapezoid_Area_calculated
       t = step*rotate_dt
@@ -407,21 +410,13 @@ contains
             xpoints = [x1, x2, x3, x4]
             ypoints = [y1, y2, y3, y4]
 
-            edges = reshape([ &
-                            x1, y1, x2, y2, &
-                            x2, y2, x4, y4, &
-                            x4, y4, x3, y3, &
-                            x3, y3, x1, y1], &
-                            shape(edges))
-
+            
             q = [0, 0, 0, 0]
 
-            mapping = reshape([ &
-                              2, 3, &
-                              1, 4, &
-                              1, 4, &
-                              2, 3], &
-                              shape(mapping))
+            mapping(1, :) = [2, 3]
+            mapping(2, :) = [1, 4]
+            mapping(3, :) = [1, 4]
+            mapping(4, :) = [2, 3]
             Do k = 1, 4
                if (PointInSector(xpoints(k), ypoints(k), centrePoint, inR, outR, sector1_startAngle, sector1_endAngle) .or. &
                    PointInSector(xpoints(k), ypoints(k), centrePoint, inR, outR, sector2_startAngle, sector2_endAngle)) then
@@ -659,8 +654,8 @@ contains
                      end if
                   end if
                end if
-               New_area=triangle_area(coordinateE, New_orthoPoint, coordinateF)
-               show(i,j)=(New_area)/(grid_dx*grid_dy)
+               New_area = triangle_area(coordinateE, New_orthoPoint, coordinateF)
+               show(i, j) = (New_area)/(grid_dx*grid_dy)
             end if
 
          end do
@@ -677,7 +672,7 @@ PROGRAM learn
    REAL(8) :: rinR, routR, rBlade, rTank, rw
    REAL(8) :: rAreaDT, rRotateDT, rtmax
    REAL(8) :: rCentre(2), rdx, rdy, rAngle1, rAngle2
-   integer ::q, nsteps
+   integer ::L, nsteps
    ! user input
    PRINT *, "Enter inner radius:"
    READ (*, *) rinR
@@ -711,10 +706,12 @@ PROGRAM learn
 
    CALL print_geometry
    !calculate grid
-   nsteps = INT(aint(rtmax/rRotateDT))
-   do q = 0, nsteps
-      call Area_Calculation(q)
-   end do
+   call Area_Calculation(15)
 
+   nsteps = INT(aint(rtmax/rRotateDT))
+   do L = 0, nsteps
+      call Area_Calculation(L)
+   end do
+   print *, show
 END PROGRAM learn
 
