@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+      {
+          "name": "Debug Fortran",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/${fileBasenameNoExtension}.out",
+          "args": [],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "externalConsole": true,
+          "MIMode": "gdb",
+          "miDebuggerPath": "E:/Fortran/MSY/mingw64/bin/gdb.exe",
+          "preLaunchTask": "build fortran"
+      }
+  ]
+}
