@@ -15,14 +15,14 @@ module Grid_Area
    REAL(8), private :: BladeLength
    REAL(8), private :: TankSize
    REAL(8), private :: w
-   REAL(8), private :: area_dt              
-   REAL(8), private :: rotate_dt           
-   REAL(8), private :: tmax                 
+   REAL(8), private :: area_dt
+   REAL(8), private :: rotate_dt
+   REAL(8), private :: tmax
    REAL(8), private :: centrePoint(2)
    REAL(8), private :: grid_dx
    REAL(8), private :: grid_dy
-   REAL(8), private :: previous_startangle1   
-   REAL(8), private :: previous_startangle2   
+   REAL(8), private :: previous_startangle1
+   REAL(8), private :: previous_startangle2
    REAL(8), private :: angle1
    REAL(8), private :: angle2
    !grid
@@ -250,31 +250,9 @@ contains
       else
          allocate (points(count, 2))
          points = temp_points(1:count, :)
-         call remove_duplicates(points, tol)
       end if
 
    end function line_circle_intersection
-
-   subroutine remove_duplicates(points, tol)
-      implicit none
-      real(8), dimension(:, :), intent(inout) :: points
-      real(8), intent(in) :: tol
-      integer :: i, j, n
-      real(8) :: diff
-
-      n = size(points, 1)
-      do i = 1, n - 1
-         do j = i + 1, n
-            diff = maxval(abs(points(i, :) - points(j, :)))
-            if (diff < tol) then
-               points(j, :) = points(n, :)
-               points = points(1:n - 1, :)
-               n = n - 1
-               exit
-            end if
-         end do
-      end do
-   end subroutine remove_duplicates
 
    function lineSegmentIntersection(x1, y1, x2, y2, x3, y3, x4, y4) result(intersection)
       use, intrinsic :: ieee_arithmetic
@@ -340,6 +318,7 @@ contains
    end function PointInSector
 
    subroutine Area_Calculation(step)
+      use, intrinsic :: ieee_arithmetic
       real(8)::sector1_startAngle
       real(8)::sector1_endAngle
       real(8)::sector2_startAngle
@@ -357,6 +336,37 @@ contains
       integer::step
       INTEGER :: i, j
       INTEGER :: ni, nj
+      real(8) :: x1, y1, x2, y2, x3, y3, x4, y4
+      real(8) :: xpoints(4), ypoints(4)
+      real(8) :: edges(4, 4)
+      integer :: q(4)
+      integer :: mapping(4, 2)
+      integer :: k
+      integer :: idx, m
+      integer :: New_m, m_count
+      integer :: New_idx(2)
+      integer :: adjacent_points(2)
+      real(8) :: orthoPoint(2)
+      integer :: calcupoint(2)
+      integer :: New_New_m, New_New_idx
+      real(8) :: New_orthoPoint(2)
+      integer :: New_calcupoint(2)
+      real(8) :: coordinateA(2), coordinateB(2), coordinateC(2), coordinateD(2), coordinateE(2), coordinateF(2)
+      real(8) :: coordinate1(2), coordinate2(2), coordinate3(2), coordinate4(2)
+      real(8) :: coordinate7(2), coordinate8(2), coordinate9(2), coordinate10(2)
+      real(8) :: coordinate13(2), coordinate14(2), coordinate15(2), coordinate16(2)
+      real(8) :: coordinate19(2), coordinate20(2), coordinate21(2), coordinate22(2)
+      real(8) :: coordinate25(2), coordinate26(2), coordinate27(2), coordinate28(2)
+      real(8) :: coordinate31(2), coordinate32(2), coordinate33(2), coordinate34(2)
+      real(8), allocatable :: coordinate5(:, :), coordinate6(:, :)
+      real(8), allocatable :: coordinate11(:, :), coordinate12(:, :)
+      real(8), allocatable :: coordinate17(:, :), coordinate18(:, :)
+      real(8), allocatable :: coordinate23(:, :), coordinate24(:, :)
+      real(8), allocatable :: coordinate29(:, :), coordinate30(:, :)
+      real(8), allocatable :: coordinate35(:, :), coordinate36(:, :)
+      real(8) ::area,New_area
+      real(8), dimension(4, 2) :: trapezoid_Point
+      real(8) :: trapezoid_Area_calculated
       t = step*rotate_dt
       add_angle = w*t
       show = 0.0d0
@@ -389,6 +399,269 @@ contains
       nj = size(Xgrid, 1)
       DO i = 1, nj - 1
          DO j = 1, ni - 1
+            x1 = Xgrid(i, j); y1 = Ygrid(i, j)
+            x2 = Xgrid(i, j + 1); y2 = Ygrid(i, j + 1)
+            x3 = Xgrid(i + 1, j); y3 = Ygrid(i + 1, j)
+            x4 = Xgrid(i + 1, j + 1); y4 = Ygrid(i + 1, j + 1)
+
+            xpoints = [x1, x2, x3, x4]
+            ypoints = [y1, y2, y3, y4]
+
+            edges = reshape([ &
+                            x1, y1, x2, y2, &
+                            x2, y2, x4, y4, &
+                            x4, y4, x3, y3, &
+                            x3, y3, x1, y1], &
+                            shape(edges))
+
+            q = [0, 0, 0, 0]
+
+            mapping = reshape([ &
+                              2, 3, &
+                              1, 4, &
+                              1, 4, &
+                              2, 3], &
+                              shape(mapping))
+            Do k = 1, 4
+               if (PointInSector(xpoints(k), ypoints(k), centrePoint, inR, outR, sector1_startAngle, sector1_endAngle) .or. &
+                   PointInSector(xpoints(k), ypoints(k), centrePoint, inR, outR, sector2_startAngle, sector2_endAngle)) then
+                  q(k) = 1
+               else
+                  q(k) = 0
+               end if
+            end do
+            !4 points
+            if (sum(q) == 4) then
+               show(i, j) = 1
+               !3 points
+            elseif (sum(q) == 3) then
+               do m = 1, 4
+                  if (q(m) == 0) then
+                     idx = m
+                     exit
+                  end if
+               end do
+               orthoPoint(1) = xpoints(idx)
+               orthoPoint(2) = ypoints(idx)
+               calcupoint = mapping(idx, :)
+               !Calculate A Point
+               coordinate1=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(1)),ypoints(calcupoint(1)),innerStartX1,innerStartY1,OuterStartX1,OuterStartY1)
+               if (.not. ieee_is_nan(coordinate1(1))) then
+                  coordinateA = coordinate1
+               else
+                  coordinate2=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(1)),ypoints(calcupoint(1)),innerEndX1,innerEndY1,OuterEndX1,OuterEndY1)
+                  if (.not. ieee_is_nan(coordinate2(1))) then
+                     coordinateA = coordinate2
+                  else
+                     coordinate3=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(1)),ypoints(calcupoint(1)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
+                     if (.not. ieee_is_nan(coordinate3(1))) then
+                        coordinateA = coordinate3
+                     else
+                      coordinate4=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(1)),ypoints(calcupoint(1)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
+                        if (.not. ieee_is_nan(coordinate4(1))) then
+                           coordinateA = coordinate4
+                        else
+                           coordinate5 = line_circle_intersection(xpoints(calcupoint(1)), ypoints(calcupoint(1)), xpoints(idx), ypoints(idx), centrePoint(1), centrePoint(2), inR)
+                           if (.not. ieee_is_nan(coordinate5(1, 1))) then
+                              coordinateA = coordinate5(1, :)
+                           else
+                              coordinate6 = line_circle_intersection(xpoints(calcupoint(1)), ypoints(calcupoint(1)), xpoints(idx), ypoints(idx), centrePoint(1), centrePoint(2), outR)
+                              if (.not. ieee_is_nan(coordinate6(1, 1))) then
+                                 coordinateA = coordinate6(1, :)
+                              end if
+                           end if
+                        end if
+                     end if
+                  end if
+               end if
+               !Calculate B Point
+               coordinate7=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerStartX1,innerStartY1,OuterStartX1,OuterStartY1)
+               if (.not. ieee_is_nan(coordinate7(1))) then
+                  coordinateB = coordinate7
+               else
+                  coordinate8=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerEndX1,innerEndY1,OuterEndX1,OuterEndY1)
+                  if (.not. ieee_is_nan(coordinate8(1))) then
+                     coordinateB = coordinate8
+                  else
+                     coordinate9=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
+                     if (.not. ieee_is_nan(coordinate9(1))) then
+                        coordinateB = coordinate9
+                     else
+                      coordinate10=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
+                        if (.not. ieee_is_nan(coordinate10(1))) then
+                           coordinateB = coordinate10
+                        else
+                           coordinate11 = line_circle_intersection(xpoints(calcupoint(2)), ypoints(calcupoint(2)), xpoints(idx), ypoints(idx), centrePoint(1), centrePoint(2), inR)
+                           if (.not. ieee_is_nan(coordinate11(1, 1))) then
+                              coordinateB = coordinate11(1, :)
+                           else
+                              coordinate12 = line_circle_intersection(xpoints(calcupoint(2)), ypoints(calcupoint(2)), xpoints(idx), ypoints(idx), centrePoint(1), centrePoint(2), outR)
+                              if (.not. ieee_is_nan(coordinate12(1, 1))) then
+                                 coordinateB = coordinate12(1, :)
+                              end if
+                           end if
+                        end if
+                     end if
+                  end if
+               end if
+               !calculate cut area
+               area = triangle_area(coordinateA, orthoPoint, coordinateB)
+               show(i, j) = ((grid_dx*grid_dy) - area)/(grid_dx*grid_dy)
+               ! 2 points
+            elseif (sum(q) == 2) then
+               m_count = 0
+               do New_m = 1, 4
+                  if (q(New_m) == 0) then
+                     m_count = m_count + 1
+                     New_idx(m_count) = New_m
+                     if (m_count == 2) exit
+                  end if
+               end do
+               adjacent_points = find_adjacent(New_idx(1), New_idx(2))
+               !Calculate C Point
+               coordinate13=lineSegmentIntersection(xpoints(New_idx(1)),ypoints(New_idx(1)),xpoints(adjacent_points(1)),ypoints(adjacent_points(1)),innerStartX1,innerStartY1,OuterStartX1,OuterStartY1)
+               if (.not. ieee_is_nan(coordinate13(1))) then
+                  coordinateC = coordinate13
+               else
+                  coordinate14=lineSegmentIntersection(xpoints(New_idx(1)),ypoints(New_idx(1)),xpoints(adjacent_points(1)),ypoints(adjacent_points(1)),innerEndX1,innerEndY1,OuterEndX1,OuterEndY1)
+                  if (.not. ieee_is_nan(coordinate14(1))) then
+                     coordinateC = coordinate14
+                  else
+                  coordinate15=lineSegmentIntersection(xpoints(New_idx(1)),ypoints(New_idx(1)),xpoints(adjacent_points(1)),ypoints(adjacent_points(1)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
+                     if (.not. ieee_is_nan(coordinate15(1))) then
+                        coordinateC = coordinate15
+                     else
+                  coordinate16=lineSegmentIntersection(xpoints(New_idx(1)),ypoints(New_idx(1)),xpoints(adjacent_points(1)),ypoints(adjacent_points(1)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
+                        if (.not. ieee_is_nan(coordinate16(1))) then
+                           coordinateC = coordinate16
+                        else
+                     coordinate17=line_circle_intersection(xpoints(adjacent_points(1)),ypoints(adjacent_points(1)),xpoints(New_idx(1)),ypoints(New_idx(1)),centrePoint(1), centrePoint(2), inR)
+                           if (.not. ieee_is_nan(coordinate17(1, 1))) then
+                              coordinateC = coordinate17(1, :)
+                           else
+                         coordinate18=line_circle_intersection(xpoints(adjacent_points(1)),ypoints(adjacent_points(1)),xpoints(New_idx(1)),ypoints(New_idx(1)),centrePoint(1), centrePoint(2), outR)
+                              if (.not. ieee_is_nan(coordinate18(1, 1))) then
+                                 coordinateC = coordinate18(1, :)
+                              end if
+                           end if
+                        end if
+                     end if
+                  end if
+               end if
+               !Calculate D Point
+               coordinate19=lineSegmentIntersection(xpoints(New_idx(2)),ypoints(New_idx(2)),xpoints(adjacent_points(2)),ypoints(adjacent_points(2)),innerStartX1,innerStartY1,OuterStartX1,OuterStartY1)
+               if (.not. ieee_is_nan(coordinate19(1))) then
+                  coordinateD = coordinate19
+               else
+                  coordinate20=lineSegmentIntersection(xpoints(New_idx(2)),ypoints(New_idx(2)),xpoints(adjacent_points(2)),ypoints(adjacent_points(2)),innerEndX1,innerEndY1,OuterEndX1,OuterEndY1)
+                  if (.not. ieee_is_nan(coordinate20(1))) then
+                     coordinateD = coordinate20
+                  else
+                  coordinate21=lineSegmentIntersection(xpoints(New_idx(2)),ypoints(New_idx(2)),xpoints(adjacent_points(2)),ypoints(adjacent_points(2)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
+                     if (.not. ieee_is_nan(coordinate21(1))) then
+                        coordinateD = coordinate21
+                     else
+                  coordinate22=lineSegmentIntersection(xpoints(New_idx(2)),ypoints(New_idx(2)),xpoints(adjacent_points(2)),ypoints(adjacent_points(2)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
+                        if (.not. ieee_is_nan(coordinate22(1))) then
+                           coordinateD = coordinate22
+                        else
+                     coordinate23=line_circle_intersection(xpoints(adjacent_points(2)),ypoints(adjacent_points(2)),xpoints(New_idx(2)),ypoints(New_idx(2)),centrePoint(1), centrePoint(2), inR)
+                           if (.not. ieee_is_nan(coordinate23(1, 1))) then
+                              coordinateD = coordinate23(1, :)
+                           else
+                         coordinate24=line_circle_intersection(xpoints(adjacent_points(2)),ypoints(adjacent_points(2)),xpoints(New_idx(2)),ypoints(New_idx(2)),centrePoint(1), centrePoint(2), outR)
+                              if (.not. ieee_is_nan(coordinate24(1, 1))) then
+                                 coordinateD = coordinate24(1, :)
+                              end if
+                           end if
+                        end if
+                     end if
+                  end if
+               end if
+               !Calculate trapzoid area
+               trapezoid_Point(1, 1) = xpoints(New_idx(1))
+               trapezoid_Point(1, 2) = ypoints(New_idx(1))
+               trapezoid_Point(2, 1) = xpoints(New_idx(2))
+               trapezoid_Point(2, 2) = ypoints(New_idx(2))
+               trapezoid_Point(3, 1) = coordinateC(1)
+               trapezoid_Point(3, 2) = coordinateC(2)
+               trapezoid_Point(4, 1) = coordinateD(1)
+               trapezoid_Point(4, 2) = coordinateD(2)
+               trapezoid_Area_calculated = trapezoid_area(trapezoid_Point)
+               show(i, j) = ((grid_dx*grid_dy) - trapezoid_Area_calculated)/(grid_dx*grid_dy)
+            elseif (sum(q) == 1) then
+               do New_New_m = 1, 4
+                  if (q(New_New_m) == 1) then
+                     New_New_idx = New_New_m
+                     exit
+                  end if
+               end do
+               New_orthoPoint(1) = xpoints(New_New_idx)
+               New_orthoPoint(2) = ypoints(New_New_idx)
+               New_calcupoint = mapping(New_New_idx, :)
+               !Calculate E point
+               coordinate25=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(1)),ypoints(New_calcupoint(1)),innerStartX1,innerStartY1,OuterStartX1,OuterStartY1)
+               if (.not. ieee_is_nan(coordinate25(1))) then
+                  coordinateE = coordinate25
+               else
+                   coordinate26=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(1)),ypoints(New_calcupoint(1)),innerEndX1,innerEndY1,OuterEndX1,OuterEndY1)
+                  if (.not. ieee_is_nan(coordinate26(1))) then
+                     coordinateE = coordinate26
+                  else
+                  coordinate27=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(1)),ypoints(New_calcupoint(1)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
+                     if (.not. ieee_is_nan(coordinate27(1))) then
+                        coordinateE = coordinate27
+                     else
+                  coordinate28=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(1)),ypoints(New_calcupoint(1)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
+                        if (.not. ieee_is_nan(coordinate28(1))) then
+                           coordinateE = coordinate28
+                        else
+                 coordinate29=line_circle_intersection(xpoints(New_calcupoint(1)),ypoints(New_calcupoint(1)),xpoints(New_New_idx),ypoints(New_New_idx), centrePoint(1), centrePoint(2), inR) 
+                           if (.not. ieee_is_nan(coordinate29(1, 1))) then
+                              coordinateE = coordinate29(1, :)
+                           else
+                               coordinate30=line_circle_intersection(xpoints(New_calcupoint(1)),ypoints(New_calcupoint(1)), xpoints(New_New_idx),ypoints(New_New_idx),centrePoint(1), centrePoint(2), outR)
+                              if (.not. ieee_is_nan(coordinate30(1, 1))) then
+                                 coordinateE = coordinate30(1, :)
+                              end if
+                           end if
+                        end if
+                     end if
+                  end if
+               end if
+               !Calculate F point
+               coordinate31=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(2)),ypoints(New_calcupoint(2)),innerStartX1,innerStartY1,OuterStartX1,OuterStartY1)
+               if (.not. ieee_is_nan(coordinate31(1))) then
+                  coordinateF = coordinate31
+               else
+                   coordinate32=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(2)),ypoints(New_calcupoint(2)),innerEndX1,innerEndY1,OuterEndX1,OuterEndY1)
+                  if (.not. ieee_is_nan(coordinate32(1))) then
+                     coordinateF = coordinate32
+                  else
+                  coordinate33=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(2)),ypoints(New_calcupoint(2)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
+                     if (.not. ieee_is_nan(coordinate33(1))) then
+                        coordinateF = coordinate33
+                     else
+                  coordinate34=lineSegmentIntersection(xpoints(New_New_idx),ypoints(New_New_idx),xpoints(New_calcupoint(2)),ypoints(New_calcupoint(2)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
+                        if (.not. ieee_is_nan(coordinate34(1))) then
+                           coordinateF = coordinate34
+                        else
+                 coordinate35=line_circle_intersection(xpoints(New_calcupoint(2)),ypoints(New_calcupoint(2)),xpoints(New_New_idx),ypoints(New_New_idx), centrePoint(1), centrePoint(2), inR) 
+                           if (.not. ieee_is_nan(coordinate35(1, 1))) then
+                              coordinateF = coordinate35(1, :)
+                           else
+                               coordinate36=line_circle_intersection(xpoints(New_calcupoint(2)),ypoints(New_calcupoint(2)), xpoints(New_New_idx),ypoints(New_New_idx),centrePoint(1), centrePoint(2), outR)
+                              if (.not. ieee_is_nan(coordinate36(1, 1))) then
+                                 coordinateF = coordinate36(1, :)
+                              end if
+                           end if
+                        end if
+                     end if
+                  end if
+               end if
+               New_area=triangle_area(coordinateE, New_orthoPoint, coordinateF)
+               show(i,j)=(New_area)/(grid_dx*grid_dy)
+            end if
 
          end do
       end do
