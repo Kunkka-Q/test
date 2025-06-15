@@ -6,10 +6,12 @@ module Grid_Area
    !public
    PUBLIC :: set_geometry
    public :: print_geometry
+   PUBLIC :: init_Grid_Area, finish_Grid_Area
    REAL(8), ALLOCATABLE, PUBLIC :: show(:, :)
    PUBLIC :: Area_Calculation
 
    !  private
+   LOGICAL, PROTECTED :: has_Grid_Area = .FALSE.
    REAL(8), private :: inR
    REAL(8), private :: outR
    REAL(8), private :: BladeLength
@@ -29,6 +31,34 @@ module Grid_Area
    PRIVATE :: generate_mesh
    REAL(8), ALLOCATABLE, PRIVATE :: Xgrid(:, :), Ygrid(:, :)
 contains
+   SUBROUTINE init_Grid_Area()
+
+      ! leaving inactive if no parameters specified
+      has_Grid_Area = .FALSE.
+      ! IF (.NOT. fort7%exists("/flow/Grid_Area")) RETURN   
+
+
+      ! retrieving rotation rate vector from parameters.json
+
+      ! display obtained parameters
+      ! IF (myid == 0) THEN
+      !    WRITE (*, '("grid TERM:")')
+      ! END IF
+
+      ! set active
+      has_Grid_Area = .TRUE.
+
+   END SUBROUTINE init_Grid_Area
+
+   SUBROUTINE finish_Grid_Area
+
+      ! revoking activity
+      has_Grid_Area = .FALSE.
+
+      RETURN
+
+   END SUBROUTINE finish_Grid_Area
+
    SUBROUTINE generate_mesh()
       IMPLICIT NONE
       INTEGER :: nx, ny, i, j
@@ -410,7 +440,6 @@ contains
             xpoints = [x1, x2, x3, x4]
             ypoints = [y1, y2, y3, y4]
 
-            
             q = [0, 0, 0, 0]
 
             mapping(1, :) = [2, 3]
