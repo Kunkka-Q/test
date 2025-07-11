@@ -1,49 +1,64 @@
 module Grid_Area
-
-   IMPLICIT NONE
+   USE core_mod
+   IMPLICIT NONE(type, external)
    PRIVATE
 
    !public
    PUBLIC :: set_geometry
    public :: print_geometry
    PUBLIC :: init_Grid_Area, finish_Grid_Area
-   REAL(8), ALLOCATABLE, PUBLIC :: show(:, :)
+   REAL(realk), ALLOCATABLE, PUBLIC :: show(:, :)
    PUBLIC :: Area_Calculation
 
    !  private
+   REAL(realk), private :: rCentre(2)
+   REAL(realk), private :: rTank
+   REAL(realk), private :: rw
+   REAL(realk), private :: rtmax
    LOGICAL, PROTECTED :: has_Grid_Area = .FALSE.
-   REAL(8), private :: inR
-   REAL(8), private :: outR
-   REAL(8), private :: BladeLength
-   REAL(8), private :: TankSize
-   REAL(8), private :: w
-   REAL(8), private :: area_dt
-   REAL(8), private :: rotate_dt
-   REAL(8), private :: tmax
-   REAL(8), private :: centrePoint(2)
-   REAL(8), private :: grid_dx
-   REAL(8), private :: grid_dy
-   REAL(8), private :: previous_startangle1
-   REAL(8), private :: previous_startangle2
-   REAL(8), private :: angle1
-   REAL(8), private :: angle2
+   REAL(realk), private :: inR
+   REAL(realk), private :: outR
+   REAL(realk), private :: BladeLength
+   REAL(realk), private :: TankSize
+   REAL(realk), private :: w
+   REAL(realk), private :: area_dt
+   REAL(realk), private :: rotate_dt
+   REAL(realk), private :: tmax
+   REAL(realk), private :: centrePoint(2)
+   REAL(realk), private :: grid_dx
+   REAL(realk), private :: grid_dy
+   REAL(realk), private :: previous_startangle1
+   REAL(realk), private :: previous_startangle2
+   REAL(realk), private :: angle1
+   REAL(realk), private :: angle2
    !grid
    PRIVATE :: generate_mesh
-   REAL(8), ALLOCATABLE, PRIVATE :: Xgrid(:, :), Ygrid(:, :)
+   REAL(realk), ALLOCATABLE, PRIVATE :: Xgrid(:, :), Ygrid(:, :)
 contains
    SUBROUTINE init_Grid_Area()
 
       ! leaving inactive if no parameters specified
       has_Grid_Area = .FALSE.
-      ! IF (.NOT. fort7%exists("/flow/Grid_Area")) RETURN   
-
+      ! IF (.NOT. fort7%exists("/flow/Grid_Area_Calculation")) RETURN   
 
       ! retrieving rotation rate vector from parameters.json
-
+      !centre position
+       CALL fort7%get_array("/flow/Grid_Area_Calculation/rCentre", rCentre)
+      !tank size
+       CALL fort7%get_array("/flow/Grid_Area_Calculation/rTank", rTank)
+      !angular velocity
+       CALL fort7%get_array("/flow/Grid_Area_Calculation/rw", rw)
+      !total simulation time
+       CALL fort7%get_array("/flow/Grid_Area_Calculation/rtmax", rtmax)
       ! display obtained parameters
-      ! IF (myid == 0) THEN
-      !    WRITE (*, '("grid TERM:")')
-      ! END IF
+      IF (myid == 0) THEN
+            WRITE(*, '("Calculate_Grid_Area TERM:")')
+            WRITE(*, '(2X, "CentrePosition: ", 2(G0, 1X))') rCentre
+            WRITE(*, '(2X, "TankSize: ", 1(G0, 1X))') rTank
+            WRITE(*, '(2X, "AngularVelocity: ", 1(G0, 1X))') rw
+            WRITE(*, '(2X, "total_simulation_time: ", 1(G0, 1X))') rtmax
+            WRITE(*, '()')
+        END IF
 
       ! set active
       has_Grid_Area = .TRUE.
@@ -61,15 +76,15 @@ contains
 
    SUBROUTINE generate_mesh()
       IMPLICIT NONE
-      INTEGER :: nx, ny, i, j
-      REAL(8), ALLOCATABLE :: XX(:), YY(:)
-      REAL(8) :: dx_step, dy_step
+      INTEGER(intk) :: nx, ny, i, j
+      REAL(realk), ALLOCATABLE :: XX(:), YY(:)
+      REAL(realk) :: dx_step, dy_step
 
       nx = INT(TankSize/grid_dx + 0.5)
       ny = INT(TankSize/grid_dy + 0.5)
 
-      dx_step = TankSize/REAL(nx, 8)
-      dy_step = TankSize/REAL(ny, 8)
+      dx_step = TankSize/REAL(nx, realk)
+      dy_step = TankSize/REAL(ny, realk)
 
       ALLOCATE (XX(nx + 1), YY(ny + 1))
       ALLOCATE (Xgrid(ny + 1, nx + 1), Ygrid(ny + 1, nx + 1))
@@ -90,12 +105,12 @@ contains
       END DO
 
       ALLOCATE (show(ny, nx))
-      show = 0.0D0
+      show = 0.0_realk
    END SUBROUTINE generate_mesh
 
    SUBROUTINE set_geometry(rinR, routR, rBlade, rTank, rw, rAreaDT, rRotateDT, rtmax, rCentre, rdx, rdy, rAngle1, rAngle2)
-      REAL(8), INTENT(IN) :: rinR, routR, rBlade, rTank, rw, rAreaDT, rRotateDT, rtmax
-      REAL(8), INTENT(IN) :: rCentre(2), rdx, rdy, rAngle1, rAngle2
+      REAL(realk), INTENT(IN) :: rinR, routR, rBlade, rTank, rw, rAreaDT, rRotateDT, rtmax
+      REAL(realk), INTENT(IN) :: rCentre(2), rdx, rdy, rAngle1, rAngle2
 
       inR = rinR
       outR = routR
@@ -115,33 +130,16 @@ contains
       CALL generate_mesh()
    END SUBROUTINE set_geometry
 
-   SUBROUTINE print_geometry()
-      PRINT *, "==== Current Geometry Parameters ===="
-      PRINT *, "Inner Radius (inR): ", inR
-      PRINT *, "Outer Radius (outR): ", outR
-      PRINT *, "Blade Length: ", BladeLength
-      PRINT *, "Tank Size: ", TankSize
-      PRINT *, "Angular Velocity (w): ", w
-      PRINT *, "Area Time Step (area_dt): ", area_dt
-      PRINT *, "Rotation Time Step (rotate_dt): ", rotate_dt
-      PRINT *, "Total Rotation Time (tmax): ", tmax
-      PRINT *, "Center Position: ", centrePoint
-      PRINT *, "Grid dx: ", grid_dx
-      PRINT *, "Grid dy: ", grid_dy
-      PRINT *, "Blade1 Initial Angle: ", previous_startangle1
-      PRINT *, "Blade2 Initial Angle: ", previous_startangle2
-      PRINT *, "==== Current Mesh Grid ====", Xgrid
-   END SUBROUTINE print_geometry
-
+   
    function trapezoid_area(points) result(area)
       implicit none
-      real(8), intent(in) :: points(4, 2)
-      real(8) :: area
-      real(8) :: sorted_points(4, 2)
-      real(8) :: top_points(2, 2), bottom_points(2, 2)
-      real(8) :: top_base, bottom_base, height
-      integer :: i, j, max_idx, k
-      real(8) :: y_values(4)
+      real(realk), intent(in) :: points(4, 2)
+      real(realk) :: area
+      real(realk) :: sorted_points(4, 2)
+      real(realk) :: top_points(2, 2), bottom_points(2, 2)
+      real(realk) :: top_base, bottom_base, height
+      integer(intk) :: i, j, max_idx, k
+      real(realk) :: y_values(4)
 
       do i = 1, 4
          do j = 1, 2
@@ -170,14 +168,14 @@ contains
       top_base = abs(top_points(2, 1) - top_points(1, 1))
       bottom_base = abs(bottom_points(2, 1) - bottom_points(1, 1))
 
-      height = (top_points(1, 2) + top_points(2, 2))/2.0d0 - (bottom_points(1, 2) + bottom_points(2, 2))/2.0d0
+      height = (top_points(1, 2) + top_points(2, 2))/2.0_realk - (bottom_points(1, 2) + bottom_points(2, 2))/2.0_realk
 
-      area = 0.5d0*(top_base + bottom_base)*height
+      area = 0.5_realk*(top_base + bottom_base)*height
 
    contains
       subroutine swap(a, b)
-         real(8), intent(inout) :: a, b
-         real(8) :: temp
+         real(realk), intent(inout) :: a, b
+         real(realk) :: temp
          temp = a
          a = b
          b = temp
@@ -186,10 +184,10 @@ contains
 
    function find_adjacent(p1, p2) result(adjacent_points)
       implicit none
-      integer, intent(in) :: p1, p2
-      integer :: grid(2, 2) = reshape([1, 2, 3, 4], [2, 2])
-      integer :: adjacent_points(2)
-      integer :: i, j, idx
+      integer(intk), intent(in) :: p1, p2
+      integer(intk) :: grid(2, 2) = reshape([1, 2, 3, 4], [2, 2])
+      integer(intk) :: adjacent_points(2)
+      integer(intk) :: i, j, idx
 
       idx = 1
 
@@ -206,26 +204,26 @@ contains
 
    function triangle_area(point1, point2, point3) result(areaa)
       implicit none
-      real(8), intent(in) :: point1(2), point2(2), point3(2)
-      real(8) :: areaa, base, height
+      real(realk), intent(in) :: point1(2), point2(2), point3(2)
+      real(realk) :: areaa, base, height
 
       base = sqrt((point2(1) - point1(1))**2 + (point2(2) - point1(2))**2)
 
       height = sqrt((point2(1) - point3(1))**2 + (point2(2) - point3(2))**2)
 
-      areaa = 0.5d0*base*height
+      areaa = 0.5_realk*base*height
    end function triangle_area
 
    function line_circle_intersection(x1, y1, x2, y2, a, b, r) result(points)
       use, intrinsic :: ieee_arithmetic
       implicit none
 
-      real(8), intent(in) :: x1, y1, x2, y2, a, b, r
-      real(8), allocatable :: points(:, :)
-      real(8) :: dx, dy, coef_a, coef_b, coef_c, disc, sqrt_disc, t1, t2
-      real(8), allocatable :: temp_points(:, :)
-      integer :: count
-      real(8), parameter :: tol = 1.0d-10
+      real(realk), intent(in) :: x1, y1, x2, y2, a, b, r
+      real(realk), allocatable :: points(:, :)
+      real(realk) :: dx, dy, coef_a, coef_b, coef_c, disc, sqrt_disc, t1, t2
+      real(realk), allocatable :: temp_points(:, :)
+      integer(intk) :: count
+      real(realk), parameter :: tol = 1.0_realk-10
 
       dx = x2 - x1
       dy = y2 - y1
@@ -240,19 +238,19 @@ contains
             points(1, 2) = y1
          else
             allocate (points(1, 2))
-            points = reshape([ieee_value(0.0_8, ieee_quiet_nan), ieee_value(0.0_8, ieee_quiet_nan)], [1, 2])
+            points = reshape([ieee_value(0.0_realk, ieee_quiet_nan), ieee_value(0.0_realk, ieee_quiet_nan)], [1, 2])
 
          end if
          return
       end if
 
-      coef_b = 2.0d0*(dx*(x1 - a) + dy*(y1 - b))
+      coef_b = 2.0_realk*(dx*(x1 - a) + dy*(y1 - b))
       coef_c = (x1 - a)**2 + (y1 - b)**2 - r**2
-      disc = coef_b**2 - 4.0d0*coef_a*coef_c
+      disc = coef_b**2 - 4.0_realk*coef_a*coef_c
 
       if (disc < -tol) then
          allocate (points(1, 2))
-         points = reshape([ieee_value(0.0_8, ieee_quiet_nan), ieee_value(0.0_8, ieee_quiet_nan)], [1, 2])
+         points = reshape([ieee_value(0.0_realk, ieee_quiet_nan), ieee_value(0.0_realk, ieee_quiet_nan)], [1, 2])
 
          return
       end if
@@ -261,16 +259,16 @@ contains
       count = 0
 
       if (disc >= -tol) then
-         sqrt_disc = sqrt(max(disc, 0.0d0))
-         t1 = (-coef_b - sqrt_disc)/(2.0d0*coef_a)
-         t2 = (-coef_b + sqrt_disc)/(2.0d0*coef_a)
+         sqrt_disc = sqrt(max(disc, 0.0_realk))
+         t1 = (-coef_b - sqrt_disc)/(2.0_realk*coef_a)
+         t2 = (-coef_b + sqrt_disc)/(2.0_realk*coef_a)
 
-         if (t1 >= -tol .and. t1 <= 1.0d0 + tol) then
+         if (t1 >= -tol .and. t1 <= 1.0_realk + tol) then
             count = count + 1
             temp_points(count, 1) = x1 + t1*dx
             temp_points(count, 2) = y1 + t1*dy
          end if
-         if (abs(t2 - t1) > tol .and. t2 >= -tol .and. t2 <= 1.0d0 + tol) then
+         if (abs(t2 - t1) > tol .and. t2 >= -tol .and. t2 <= 1.0_realk + tol) then
             count = count + 1
             temp_points(count, 1) = x1 + t2*dx
             temp_points(count, 2) = y1 + t2*dy
@@ -279,7 +277,7 @@ contains
 
       if (count == 0) then
          allocate (points(1, 2))
-         points = reshape([ieee_value(0.0_8, ieee_quiet_nan), ieee_value(0.0_8, ieee_quiet_nan)], [1, 2])
+         points = reshape([ieee_value(0.0_realk, ieee_quiet_nan), ieee_value(0.0_realk, ieee_quiet_nan)], [1, 2])
 
       else
          allocate (points(count, 2))
@@ -291,9 +289,9 @@ contains
    function lineSegmentIntersection(x1, y1, x2, y2, x3, y3, x4, y4) result(intersection)
       use, intrinsic :: ieee_arithmetic
       implicit none
-      real(8), intent(in) :: x1, y1, x2, y2, x3, y3, x4, y4
-      real(8) :: dx1, dy1, dx2, dy2, denom, t, u, px, py
-      real(8), allocatable :: intersection(:)
+      real(realk), intent(in) :: x1, y1, x2, y2, x3, y3, x4, y4
+      real(realk) :: dx1, dy1, dx2, dy2, denom, t, u, px, py
+      real(realk), allocatable :: intersection(:)
 
       dx1 = x2 - x1
       dy1 = y2 - y1
@@ -306,7 +304,7 @@ contains
          t = ((x3 - x1)*dy2 - (y3 - y1)*dx2)/denom
          u = ((x3 - x1)*dy1 - (y3 - y1)*dx1)/denom
 
-         if (t >= 0.0d0 .and. t <= 1.0d0 .and. u >= 0.0d0 .and. u <= 1.0d0) then
+         if (t >= 0.0_realk .and. t <= 1.0_realk .and. u >= 0.0_realk .and. u <= 1.0_realk) then
             px = x1 + t*dx1
             py = y1 + t*dy1
             allocate (intersection(2))
@@ -314,31 +312,31 @@ contains
             intersection(2) = py
          else
             allocate (intersection(2))
-            intersection = [ieee_value(0.0_8, ieee_quiet_nan), ieee_value(0.0_8, ieee_quiet_nan)]
+            intersection = [ieee_value(0.0_realk, ieee_quiet_nan), ieee_value(0.0_realk, ieee_quiet_nan)]
          end if
       else
          allocate (intersection(2))
-         intersection = [ieee_value(0.0_8, ieee_quiet_nan), ieee_value(0.0_8, ieee_quiet_nan)]
+         intersection = [ieee_value(0.0_realk, ieee_quiet_nan), ieee_value(0.0_realk, ieee_quiet_nan)]
       end if
    end function lineSegmentIntersection
 
    logical function PointInSector(px, py, centre, innerR, outerR, startAngle, endAngle)
       implicit none
-      real(8), intent(in) :: px, py
-      real(8), intent(in) :: centre(2)
-      real(8), intent(in) :: innerR, outerR, startAngle, endAngle
-      real(8) :: distance, angle
-      real(8) :: modStartAngle, modEndAngle
+      real(realk), intent(in) :: px, py
+      real(realk), intent(in) :: centre(2)
+      real(realk), intent(in) :: innerR, outerR, startAngle, endAngle
+      real(realk) :: distance, angle
+      real(realk) :: modStartAngle, modEndAngle
 
-      modStartAngle = mod(startAngle, 2.0d0*3.141592653589793d0)
-      modEndAngle = mod(endAngle, 2.0d0*3.141592653589793d0)
+      modStartAngle = mod(startAngle, 2.0_realk*3.141592653589793_realk)
+      modEndAngle = mod(endAngle, 2.0_realk*3.141592653589793_realk)
 
       distance = sqrt((px - centre(1))**2 + (py - centre(2))**2)
 
       angle = atan2(py - centre(2), px - centre(1))
 
-      if (angle < 0.0d0) then
-         angle = angle + 2.0d0*3.141592653589793d0
+      if (angle < 0.0_realk) then
+         angle = angle + 2.0_realk*3.141592653589793_realk
       end if
 
       if (distance >= innerR .and. distance <= outerR .and. &
@@ -353,56 +351,61 @@ contains
 
    subroutine Area_Calculation(step)
       use, intrinsic :: ieee_arithmetic
-      real(8)::sector1_startAngle
-      real(8)::sector1_endAngle
-      real(8)::sector2_startAngle
-      real(8)::sector2_endAngle
-      real(8)::add_angle
-      real(8)::t
-      REAL(8) :: innerStartX1, innerStartY1
-      REAL(8) :: innerEndX1, innerEndY1
-      REAL(8) :: OuterStartX1, OuterStartY1
-      REAL(8) :: OuterEndX1, OuterEndY1
-      REAL(8) :: innerStartX2, innerStartY2
-      REAL(8) :: innerEndX2, innerEndY2
-      REAL(8) :: OuterStartX2, OuterStartY2
-      REAL(8) :: OuterEndX2, OuterEndY2
-      integer::step
-      INTEGER :: i, j
-      INTEGER :: ni, nj
-      real(8) :: x1, y1, x2, y2, x3, y3, x4, y4
-      real(8) :: xpoints(4), ypoints(4)
-      integer :: q(4)
-      integer :: mapping(4, 2)
-      integer :: k
-      integer :: idx, m
-      integer :: New_m, m_count
-      integer :: New_idx(2)
-      integer :: adjacent_points(2)
-      real(8) :: orthoPoint(2)
-      integer :: calcupoint(2)
-      integer :: New_New_m, New_New_idx
-      real(8) :: New_orthoPoint(2)
-      integer :: New_calcupoint(2)
-      real(8) :: coordinateA(2), coordinateB(2), coordinateC(2), coordinateD(2), coordinateE(2), coordinateF(2)
-      real(8) :: coordinate1(2), coordinate2(2), coordinate3(2), coordinate4(2)
-      real(8) :: coordinate7(2), coordinate8(2), coordinate9(2), coordinate10(2)
-      real(8) :: coordinate13(2), coordinate14(2), coordinate15(2), coordinate16(2)
-      real(8) :: coordinate19(2), coordinate20(2), coordinate21(2), coordinate22(2)
-      real(8) :: coordinate25(2), coordinate26(2), coordinate27(2), coordinate28(2)
-      real(8) :: coordinate31(2), coordinate32(2), coordinate33(2), coordinate34(2)
-      real(8), allocatable :: coordinate5(:, :), coordinate6(:, :)
-      real(8), allocatable :: coordinate11(:, :), coordinate12(:, :)
-      real(8), allocatable :: coordinate17(:, :), coordinate18(:, :)
-      real(8), allocatable :: coordinate23(:, :), coordinate24(:, :)
-      real(8), allocatable :: coordinate29(:, :), coordinate30(:, :)
-      real(8), allocatable :: coordinate35(:, :), coordinate36(:, :)
-      real(8) ::area, New_area
-      real(8), dimension(4, 2) :: trapezoid_Point
-      real(8) :: trapezoid_Area_calculated
+      real(realk)::sector1_startAngle
+      real(realk)::sector1_endAngle
+      real(realk)::sector2_startAngle
+      real(realk)::sector2_endAngle
+      real(realk)::add_angle
+      real(realk)::t
+      REAL(realk) :: innerStartX1, innerStartY1
+      REAL(realk) :: innerEndX1, innerEndY1
+      REAL(realk) :: OuterStartX1, OuterStartY1
+      REAL(realk) :: OuterEndX1, OuterEndY1
+      REAL(realk) :: innerStartX2, innerStartY2
+      REAL(realk) :: innerEndX2, innerEndY2
+      REAL(realk) :: OuterStartX2, OuterStartY2
+      REAL(realk) :: OuterEndX2, OuterEndY2
+      integer(intk)::step
+      INTEGER(intk) :: i, j
+      INTEGER(intk) :: ni, nj
+      real(realk) :: x1, y1, x2, y2, x3, y3, x4, y4
+      real(realk) :: xpoints(4), ypoints(4)
+      integer(intk) :: q(4)
+      integer(intk) :: mapping(4, 2)
+      integer(intk) :: k
+      integer(intk) :: idx, m
+      integer(intk) :: New_m, m_count
+      integer(intk) :: New_idx(2)
+      integer(intk) :: adjacent_points(2)
+      real(realk) :: orthoPoint(2)
+      integer(intk) :: calcupoint(2)
+      integer(intk) :: New_New_m, New_New_idx
+      real(realk) :: New_orthoPoint(2)
+      integer(intk) :: New_calcupoint(2)
+      real(realk) :: coordinateA(2), coordinateB(2), coordinateC(2), coordinateD(2), coordinateE(2), coordinateF(2)
+      real(realk) :: coordinate1(2), coordinate2(2), coordinate3(2), coordinate4(2)
+      real(realk) :: coordinate7(2), coordinate8(2), coordinate9(2), coordinate10(2)
+      real(realk) :: coordinate13(2), coordinate14(2), coordinate15(2), coordinate16(2)
+      real(realk) :: coordinate19(2), coordinate20(2), coordinate21(2), coordinate22(2)
+      real(realk) :: coordinate25(2), coordinate26(2), coordinate27(2), coordinate28(2)
+      real(realk) :: coordinate31(2), coordinate32(2), coordinate33(2), coordinate34(2)
+      real(realk), allocatable :: coordinate5(:, :), coordinate6(:, :)
+      real(realk), allocatable :: coordinate11(:, :), coordinate12(:, :)
+      real(realk), allocatable :: coordinate17(:, :), coordinate18(:, :)
+      real(realk), allocatable :: coordinate23(:, :), coordinate24(:, :)
+      real(realk), allocatable :: coordinate29(:, :), coordinate30(:, :)
+      real(realk), allocatable :: coordinate35(:, :), coordinate36(:, :)
+      real(realk) ::area, New_area
+      real(realk), dimension(4, 2) :: trapezoid_Point
+      real(realk) :: trapezoid_Area_calculated
+
+      !check status
+      IF (.NOT. has_Grid_Area) RETURN
+
       t = step*rotate_dt
       add_angle = w*t
-      show = 0.0d0
+      show = 0.0_realk
+      
       !sectror1
       sector1_startAngle = previous_startangle1 + add_angle
       sector1_endAngle = angle1 + add_angle
@@ -694,53 +697,5 @@ contains
 
 end module Grid_Area
 
-PROGRAM learn
-   USE Grid_Area
-   IMPLICIT NONE
 
-   REAL(8) :: rinR, routR, rBlade, rTank, rw
-   REAL(8) :: rAreaDT, rRotateDT, rtmax
-   REAL(8) :: rCentre(2), rdx, rdy, rAngle1, rAngle2
-   integer ::L, nsteps
-   ! user input
-   PRINT *, "Enter inner radius:"
-   READ (*, *) rinR
-   PRINT *, "Enter outer radius:"
-   READ (*, *) routR
-   PRINT *, "Enter blade length:"
-   READ (*, *) rBlade
-   PRINT *, "Enter tank size:"
-   READ (*, *) rTank
-   PRINT *, "Enter angular velocity:"
-   READ (*, *) rw
-   PRINT *, "Enter area time step:"
-   READ (*, *) rAreaDT
-   PRINT *, "Enter rotate time step:"
-   READ (*, *) rRotateDT
-   PRINT *, "Enter total rotate time:"
-   READ (*, *) rtmax
-   PRINT *, "Enter center point coordinates (x y):"
-   READ (*, *) rCentre(1), rCentre(2)
-   PRINT *, "Enter grid dx:"
-   READ (*, *) rdx
-   PRINT *, "Enter grid dy:"
-   READ (*, *) rdy
-   PRINT *, "Enter blade 1 initial angle:"
-   READ (*, *) rAngle1
-   PRINT *, "Enter blade 2 initial angle:"
-   READ (*, *) rAngle2
-
-   CALL set_geometry(rinR, routR, rBlade, rTank, rw, rAreaDT, rRotateDT, rtmax, &
-                     rCentre, rdx, rdy, rAngle1, rAngle2)
-
-   CALL print_geometry
-   !calculate grid
-   call Area_Calculation(15)
-
-   nsteps = INT(aint(rtmax/rRotateDT))
-   do L = 0, nsteps
-      call Area_Calculation(L)
-   end do
-   print *, show
-END PROGRAM learn
 
