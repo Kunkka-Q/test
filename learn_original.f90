@@ -510,11 +510,11 @@ contains
                   if (.not. ieee_is_nan(coordinate8(1))) then
                      coordinateB = coordinate8
                   else
-                  coordinate9=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
+                     coordinate9=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerStartX2,innerStartY2,OuterStartX2,OuterStartY2)
                      if (.not. ieee_is_nan(coordinate9(1))) then
                         coordinateB = coordinate9
                      else
-                  coordinate10=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
+                      coordinate10=lineSegmentIntersection(xpoints(idx),ypoints(idx),xpoints(calcupoint(2)),ypoints(calcupoint(2)),innerEndX2,innerEndY2,OuterEndX2,OuterEndY2)
                         if (.not. ieee_is_nan(coordinate10(1))) then
                            coordinateB = coordinate10
                         else
@@ -695,7 +695,4 @@ contains
 
    end subroutine Area_Calculation
 
-end module Grid_Area
-
-
-
+end module Grid_Area 
